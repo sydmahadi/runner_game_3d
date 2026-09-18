@@ -1,5 +1,5 @@
 ; Engine configuration file.
-; 3D Endless Runner Game
+; Runner Game 3D
 
 config_version=5
 
@@ -23,4 +23,4 @@ renderer/rendering_method.mobile="gl_compatibility"
 
 textures/vram_compression/import_etc2_astc=true
 
-environment/defaults/default_clear_color=Color(0.04, 0.08, 0.06, 1)
+environment/defaults/default_clear_color=Color(0.38, 0.68, 0.92, 1)

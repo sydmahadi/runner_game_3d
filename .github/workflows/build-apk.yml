@@ -33,7 +33,7 @@ jobs:
           use-dotnet: false
 
 
-      # 4. Godot Export Templates
+      # 4. Install Godot Export Templates
       - name: Install Godot Export Templates
         run: |
           mkdir -p ~/.local/share/godot/export_templates/4.3.stable
@@ -85,18 +85,89 @@ jobs:
             -dname "CN=Android Debug,O=Android,C=US"
 
 
-      # 8. Show Project Files
-      - name: Check Project
+      # 8. Create Android Export Preset
+      - name: Create Android Export Preset
         run: |
-          echo "===== PROJECT ====="
-          ls -la
+          cat > export_presets.cfg <<'EOF'
+          [preset.0]
 
-          echo "===== EXPORT PRESET ====="
+          name="Android"
+          platform="Android"
+          runnable=true
+          advanced_options=false
+          dedicated_server=false
+          custom_features=""
+          export_filter="all_resources"
+          include_filter=""
+          exclude_filter=""
+          export_path=""
+
+          [preset.0.options]
+
+          custom_template/debug=""
+          custom_template/release=""
+
+          gradle_build/use_gradle_build=false
+          gradle_build/export_format=0
+          gradle_build/min_sdk=""
+          gradle_build/target_sdk=""
+
+          architectures/armeabi-v7a=false
+          architectures/arm64-v8a=true
+          architectures/x86=false
+          architectures/x86_64=false
+
+          version/code=1
+          version/name="1.0"
+
+          package/unique_name="com.runner.game3d"
+          package/name="Runner Game 3D"
+          package/short_name="Runner Game 3D"
+
+          screen/immersive_mode=true
+          screen/orientation=1
+
+          launcher_icons/main_192x192=""
+          launcher_icons/adaptive_foreground_432x432=""
+          launcher_icons/adaptive_background_432x432=""
+          launcher_icons/adaptive_monochrome_432x432=""
+
+          one_click_deploy/clear_previous_install=true
+          EOF
+
+
+      # 9. Configure Godot Android Paths
+      - name: Configure Godot Android Paths
+        run: |
+          mkdir -p ~/.config/godot
+
+          cat > ~/.config/godot/editor_settings-4.3.tres <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/android_sdk_path = "/usr/local/lib/android/sdk"
+          EOF
+
+
+      # 10. Check Files
+      - name: Check Configuration
+        run: |
+          echo "===== export_presets.cfg ====="
           cat export_presets.cfg
 
+          echo ""
+          echo "===== debug.keystore ====="
+          ls -lh debug.keystore
 
-      # 9. Import Project
-      - name: Import Project
+          echo ""
+          echo "===== Project ====="
+          ls -la
+
+
+      # 11. Import Project
+      - name: Import Godot Project
         run: |
           godot \
             --headless \
@@ -105,17 +176,7 @@ jobs:
             --quit
 
 
-      # 10. List Export Presets
-      - name: Check Export Presets
-        run: |
-          godot \
-            --headless \
-            --path . \
-            --export-debug "Android" \
-            /tmp/test.apk
-
-
-      # 11. Build APK
+      # 12. Build APK
       - name: Build APK
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/debug.keystore
@@ -132,15 +193,18 @@ jobs:
             build/RunnerGame.apk
 
 
-      # 12. Check APK
+      # 13. Check APK
       - name: Check APK
         run: |
+          echo "===== BUILD RESULT ====="
           ls -lh build/
 
           test -f build/RunnerGame.apk
 
+          echo "APK BUILD SUCCESSFUL!"
 
-      # 13. Upload APK
+
+      # 14. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:

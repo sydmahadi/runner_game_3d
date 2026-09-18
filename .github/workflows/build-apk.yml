@@ -11,21 +11,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
+      # 1. Checkout
       - name: Checkout
         uses: actions/checkout@v4
 
+
+      # 2. Setup Java 17
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
+
+      # 3. Setup Godot 4.3
       - name: Setup Godot
         uses: chickensoft-games/setup-godot@v2
         with:
           version: "4.3.0"
           use-dotnet: false
 
+
+      # 4. Install Godot Export Templates
       - name: Install Godot Export Templates
         run: |
           mkdir -p ~/.local/share/godot/export_templates/4.3.stable
@@ -35,27 +43,40 @@ jobs:
             -O /tmp/templates.tpz
 
           mkdir -p /tmp/godot_templates
-          unzip -q /tmp/templates.tpz -d /tmp/godot_templates
 
-          cp -r /tmp/godot_templates/templates/* \
+          unzip -q \
+            /tmp/templates.tpz \
+            -d /tmp/godot_templates
+
+          cp -r \
+            /tmp/godot_templates/templates/* \
             ~/.local/share/godot/export_templates/4.3.stable/
 
+
+      # 5. Setup Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
+          packages: ""
           accept-android-sdk-licenses: true
           log-accepted-android-sdk-licenses: false
 
+
+      # 6. Install Required Android SDK Packages
       - name: Install Android SDK Packages
         run: |
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-34"
           sdkmanager "build-tools;34.0.0"
 
+
+      # 7. Import Godot Project
       - name: Import Godot Project
         run: |
           godot --headless --editor --quit
 
+
+      # 8. Build Android APK
       - name: Build APK
         run: |
           mkdir -p build
@@ -65,6 +86,8 @@ jobs:
             --export-debug "Android" \
             build/RunnerGame.apk
 
+
+      # 9. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:

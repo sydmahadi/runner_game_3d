@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v4
 
 
-      # 2. Setup Java 17
+      # 2. Java 17
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
@@ -25,7 +25,7 @@ jobs:
           java-version: '17'
 
 
-      # 3. Setup Godot 4.3
+      # 3. Godot 4.3
       - name: Setup Godot
         uses: chickensoft-games/setup-godot@v2
         with:
@@ -33,7 +33,7 @@ jobs:
           use-dotnet: false
 
 
-      # 4. Install Godot Export Templates
+      # 4. Godot Export Templates
       - name: Install Godot Export Templates
         run: |
           mkdir -p ~/.local/share/godot/export_templates/4.3.stable
@@ -53,7 +53,7 @@ jobs:
             ~/.local/share/godot/export_templates/4.3.stable/
 
 
-      # 5. Setup Android SDK
+      # 5. Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -62,7 +62,7 @@ jobs:
           log-accepted-android-sdk-licenses: false
 
 
-      # 6. Install Android SDK Packages
+      # 6. Android SDK Packages
       - name: Install Android SDK Packages
         run: |
           sdkmanager "platform-tools"
@@ -85,31 +85,37 @@ jobs:
             -dname "CN=Android Debug,O=Android,C=US"
 
 
-      # 8. Check Godot Project
-      - name: Check Godot Project
+      # 8. Show Project Files
+      - name: Check Project
         run: |
-          echo "===== Project files ====="
+          echo "===== PROJECT ====="
           ls -la
 
-          echo "===== Export presets ====="
-          if [ -f export_presets.cfg ]; then
-            cat export_presets.cfg
-          else
-            echo "ERROR: export_presets.cfg not found!"
-            exit 1
-          fi
+          echo "===== EXPORT PRESET ====="
+          cat export_presets.cfg
 
 
-      # 9. Import Godot Project
-      - name: Import Godot Project
+      # 9. Import Project
+      - name: Import Project
         run: |
-          godot --headless \
+          godot \
+            --headless \
             --editor \
             --path . \
             --quit
 
 
-      # 10. Build Android APK
+      # 10. List Export Presets
+      - name: Check Export Presets
+        run: |
+          godot \
+            --headless \
+            --path . \
+            --export-debug "Android" \
+            /tmp/test.apk
+
+
+      # 11. Build APK
       - name: Build APK
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/debug.keystore
@@ -118,28 +124,23 @@ jobs:
         run: |
           mkdir -p build
 
-          godot --headless \
+          godot \
+            --headless \
             --verbose \
             --path . \
             --export-debug "Android" \
             build/RunnerGame.apk
 
 
-      # 11. Check APK
+      # 12. Check APK
       - name: Check APK
         run: |
-          echo "===== Build folder ====="
-          ls -lah build
+          ls -lh build/
 
-          if [ -f build/RunnerGame.apk ]; then
-            echo "APK BUILD SUCCESSFUL!"
-          else
-            echo "APK NOT FOUND!"
-            exit 1
-          fi
+          test -f build/RunnerGame.apk
 
 
-      # 12. Upload APK
+      # 13. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:

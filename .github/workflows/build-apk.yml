@@ -26,25 +26,18 @@ jobs:
           wget -q \
             https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz \
             -O /tmp/templates.tpz
+          mkdir -p /tmp/godot_templates
           unzip -q /tmp/templates.tpz -d /tmp/godot_templates
           cp -r /tmp/godot_templates/templates/* \
             ~/.local/share/godot/export_templates/4.3.stable/
 
-      - name: Install Android SDK
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK Packages
+      - name: Install Android SDK
         run: |
-          sdkmanager "platform-tools"
-          sdkmanager "platforms;android-34"
-          sdkmanager "build-tools;34.0.0"
-          yes | sdkmanager --licenses || true
-
-      - name: Install JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       - name: Build APK
         run: |

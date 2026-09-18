@@ -34,10 +34,6 @@ jobs:
             rmdir ~/.local/share/godot/export_templates/4.3.stable/templates
           fi
 
-      - name: Import Project
-        run: |
-          godot --headless --editor --quit
-
       - name: Build APK
         run: |
           mkdir -p build

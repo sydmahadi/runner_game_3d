@@ -14,6 +14,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - name: Setup Godot
         uses: chickensoft-games/setup-godot@v2
         with:
@@ -23,25 +29,37 @@ jobs:
       - name: Install Godot Export Templates
         run: |
           mkdir -p ~/.local/share/godot/export_templates/4.3.stable
+
           wget -q \
             https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz \
             -O /tmp/templates.tpz
+
           mkdir -p /tmp/godot_templates
           unzip -q /tmp/templates.tpz -d /tmp/godot_templates
+
           cp -r /tmp/godot_templates/templates/* \
             ~/.local/share/godot/export_templates/4.3.stable/
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
 
-      - name: Install Android SDK
+      - name: Install Android SDK Packages
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-34"
+          sdkmanager "build-tools;34.0.0"
+
+      - name: Import Godot Project
+        run: |
+          godot --headless --editor --quit
 
       - name: Build APK
         run: |
           mkdir -p build
+
           godot --headless \
             --path . \
             --export-debug "Android" \

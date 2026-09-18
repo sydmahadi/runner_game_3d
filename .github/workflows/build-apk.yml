@@ -85,13 +85,31 @@ jobs:
             -dname "CN=Android Debug,O=Android,C=US"
 
 
-      # 8. Import Godot Project
+      # 8. Check Godot Project
+      - name: Check Godot Project
+        run: |
+          echo "===== Project files ====="
+          ls -la
+
+          echo "===== Export presets ====="
+          if [ -f export_presets.cfg ]; then
+            cat export_presets.cfg
+          else
+            echo "ERROR: export_presets.cfg not found!"
+            exit 1
+          fi
+
+
+      # 9. Import Godot Project
       - name: Import Godot Project
         run: |
-          godot --headless --editor --quit
+          godot --headless \
+            --editor \
+            --path . \
+            --quit
 
 
-      # 9. Build Android APK
+      # 10. Build Android APK
       - name: Build APK
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/debug.keystore
@@ -101,18 +119,27 @@ jobs:
           mkdir -p build
 
           godot --headless \
+            --verbose \
             --path . \
             --export-debug "Android" \
             build/RunnerGame.apk
 
 
-      # 10. Check APK
+      # 11. Check APK
       - name: Check APK
         run: |
-          ls -lh build/RunnerGame.apk
+          echo "===== Build folder ====="
+          ls -lah build
+
+          if [ -f build/RunnerGame.apk ]; then
+            echo "APK BUILD SUCCESSFUL!"
+          else
+            echo "APK NOT FOUND!"
+            exit 1
+          fi
 
 
-      # 11. Upload APK
+      # 12. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:

@@ -71,18 +71,15 @@ jobs:
             -keypass android \
             -dname "CN=Android Debug,O=Android,C=US"
 
-      - name: Configure Godot Android
+      - name: Check Project Files
         run: |
-          mkdir -p ~/.config/godot
-
-          cat > ~/.config/godot/editor_settings-4.3.tres <<EOF
-          [gd_resource type="EditorSettings" format=3]
-
-          [resource]
-
-          export/android/java_sdk_path = "$JAVA_HOME"
-          export/android/android_sdk_path = "/usr/local/lib/android/sdk"
-          EOF
+          echo "===== PROJECT FILES ====="
+          ls -la
+          echo "===== WORKFLOW ====="
+          ls -la .github/workflows
+          echo "===== EXPORT PRESET ====="
+          cat export_presets.cfg
+          echo "========================"
 
       - name: Import Godot Project
         run: |
@@ -92,13 +89,18 @@ jobs:
             --path . \
             --quit
 
-      - name: Verify Export Preset
+      - name: Check Godot Export Templates
         run: |
-          echo "===== export_presets.cfg ====="
-          cat export_presets.cfg
-          echo "=============================="
+          echo "===== GODOT VERSION ====="
+          godot --version
 
-      - name: Build Android APK
+          echo "===== EXPORT TEMPLATES ====="
+          find ~/.local/share/godot/export_templates \
+            -maxdepth 2 \
+            -type f \
+            -print
+
+      - name: Validate Android Export
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/debug.keystore
           GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
@@ -108,7 +110,6 @@ jobs:
 
           godot \
             --headless \
-            --verbose \
             --path . \
             --export-debug \
             "Android" \
@@ -118,7 +119,12 @@ jobs:
         run: |
           echo "===== BUILD RESULT ====="
           ls -lh build/
-          test -f build/RunnerGame.apk
+
+          if [ ! -f build/RunnerGame.apk ]; then
+            echo "APK was not created."
+            exit 1
+          fi
+
           echo "APK BUILD SUCCESSFUL!"
 
       - name: Upload APK

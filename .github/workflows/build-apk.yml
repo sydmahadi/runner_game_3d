@@ -12,28 +12,21 @@ jobs:
 
     steps:
 
-      # 1. Checkout
       - name: Checkout
         uses: actions/checkout@v4
 
-
-      # 2. Java 17
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-
-      # 3. Godot 4.3
       - name: Setup Godot
         uses: chickensoft-games/setup-godot@v2
         with:
           version: "4.3.0"
           use-dotnet: false
 
-
-      # 4. Install Godot Export Templates
       - name: Install Godot Export Templates
         run: |
           mkdir -p ~/.local/share/godot/export_templates/4.3.stable
@@ -52,8 +45,6 @@ jobs:
             /tmp/godot_templates/templates/* \
             ~/.local/share/godot/export_templates/4.3.stable/
 
-
-      # 5. Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -61,16 +52,12 @@ jobs:
           accept-android-sdk-licenses: true
           log-accepted-android-sdk-licenses: false
 
-
-      # 6. Android SDK Packages
       - name: Install Android SDK Packages
         run: |
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-34"
           sdkmanager "build-tools;34.0.0"
 
-
-      # 7. Create Debug Keystore
       - name: Create Debug Keystore
         run: |
           keytool -genkeypair \
@@ -84,60 +71,7 @@ jobs:
             -keypass android \
             -dname "CN=Android Debug,O=Android,C=US"
 
-
-      # 8. Create Android Export Preset
-      - name: Create Android Export Preset
-        run: |
-          cat > export_presets.cfg <<'EOF'
-          [preset.0]
-
-          name="Android"
-          platform="Android"
-          runnable=true
-          advanced_options=false
-          dedicated_server=false
-          custom_features=""
-          export_filter="all_resources"
-          include_filter=""
-          exclude_filter=""
-          export_path=""
-
-          [preset.0.options]
-
-          custom_template/debug=""
-          custom_template/release=""
-
-          gradle_build/use_gradle_build=false
-          gradle_build/export_format=0
-          gradle_build/min_sdk=""
-          gradle_build/target_sdk=""
-
-          architectures/armeabi-v7a=false
-          architectures/arm64-v8a=true
-          architectures/x86=false
-          architectures/x86_64=false
-
-          version/code=1
-          version/name="1.0"
-
-          package/unique_name="com.runner.game3d"
-          package/name="Runner Game 3D"
-          package/short_name="Runner Game 3D"
-
-          screen/immersive_mode=true
-          screen/orientation=1
-
-          launcher_icons/main_192x192=""
-          launcher_icons/adaptive_foreground_432x432=""
-          launcher_icons/adaptive_background_432x432=""
-          launcher_icons/adaptive_monochrome_432x432=""
-
-          one_click_deploy/clear_previous_install=true
-          EOF
-
-
-      # 9. Configure Godot Android Paths
-      - name: Configure Godot Android Paths
+      - name: Configure Godot Android
         run: |
           mkdir -p ~/.config/godot
 
@@ -150,23 +84,6 @@ jobs:
           export/android/android_sdk_path = "/usr/local/lib/android/sdk"
           EOF
 
-
-      # 10. Check Files
-      - name: Check Configuration
-        run: |
-          echo "===== export_presets.cfg ====="
-          cat export_presets.cfg
-
-          echo ""
-          echo "===== debug.keystore ====="
-          ls -lh debug.keystore
-
-          echo ""
-          echo "===== Project ====="
-          ls -la
-
-
-      # 11. Import Project
       - name: Import Godot Project
         run: |
           godot \
@@ -175,9 +92,13 @@ jobs:
             --path . \
             --quit
 
+      - name: Verify Export Preset
+        run: |
+          echo "===== export_presets.cfg ====="
+          cat export_presets.cfg
+          echo "=============================="
 
-      # 12. Build APK
-      - name: Build APK
+      - name: Build Android APK
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/debug.keystore
           GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
@@ -189,22 +110,17 @@ jobs:
             --headless \
             --verbose \
             --path . \
-            --export-debug "Android" \
+            --export-debug \
+            "Android" \
             build/RunnerGame.apk
 
-
-      # 13. Check APK
       - name: Check APK
         run: |
           echo "===== BUILD RESULT ====="
           ls -lh build/
-
           test -f build/RunnerGame.apk
-
           echo "APK BUILD SUCCESSFUL!"
 
-
-      # 14. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:

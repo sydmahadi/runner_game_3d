@@ -1,6 +1,3 @@
-; Runner Game 3D
-; Godot 4.3
-
 config_version=5
 
 [application]
@@ -20,6 +17,4 @@ window/stretch/mode="canvas_items"
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-textures/vram_compression/import_etc2_astc=true
-
 environment/defaults/default_clear_color=Color(0.38, 0.68, 0.92, 1)

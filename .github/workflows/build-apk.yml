@@ -20,26 +20,38 @@ jobs:
           version: "4.3.0"
           use-dotnet: false
 
-      - name: Install Android Export Templates
+      - name: Install Godot Export Templates
         run: |
           mkdir -p ~/.local/share/godot/export_templates/4.3.stable
-          wget -O /tmp/templates.tpz \
-            https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz
-          unzip -o /tmp/templates.tpz \
-            -d ~/.local/share/godot/export_templates/4.3.stable/
-          
-          if [ -d ~/.local/share/godot/export_templates/4.3.stable/templates ]; then
-            mv ~/.local/share/godot/export_templates/4.3.stable/templates/* \
-              ~/.local/share/godot/export_templates/4.3.stable/
-            rmdir ~/.local/share/godot/export_templates/4.3.stable/templates
-          fi
+          wget -q \
+            https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz \
+            -O /tmp/templates.tpz
+          unzip -q /tmp/templates.tpz -d /tmp/godot_templates
+          cp -r /tmp/godot_templates/templates/* \
+            ~/.local/share/godot/export_templates/4.3.stable/
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK Packages
+        run: |
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-34"
+          sdkmanager "build-tools;34.0.0"
+          yes | sdkmanager --licenses || true
+
+      - name: Install JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
 
       - name: Build APK
         run: |
           mkdir -p build
           godot --headless \
             --path . \
-            --export-release "Android" \
+            --export-debug "Android" \
             build/RunnerGame.apk
 
       - name: Upload APK

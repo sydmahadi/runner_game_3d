@@ -11,15 +11,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Setup Godot
         uses: chickensoft-games/setup-godot@v2
@@ -27,30 +26,19 @@ jobs:
           version: "4.3.0"
           use-dotnet: false
 
-      - name: Install Godot Export Templates
-        run: |
-          mkdir -p ~/.local/share/godot/export_templates/4.3.stable
-          wget -q https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz
-          unzip -o Godot_v4.3-stable_export_templates.tpz -d /tmp/godot_templates
-          cp /tmp/godot_templates/templates/android_debug.apk ~/.local/share/godot/export_templates/4.3.stable/
-          cp /tmp/godot_templates/templates/android_release.apk ~/.local/share/godot/export_templates/4.3.stable/
-          cp /tmp/godot_templates/templates/android_source.zip ~/.local/share/godot/export_templates/4.3.stable/
-
-      - name: Setup Android SDK
+      - name: Setup Android
         uses: android-actions/setup-android@v3
         with:
           packages: ""
 
-      - name: Install Android SDK packages
+      - name: Install Android SDK
         run: |
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-      - name: Create debug keystore
+      - name: Create Debug Keystore
         run: |
           mkdir -p ~/.android
-
-          keytool \
-            -genkeypair \
+          keytool -genkeypair \
             -v \
             -keystore ~/.android/debug.keystore \
             -storepass android \
@@ -61,7 +49,7 @@ jobs:
             -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
 
-      - name: Create Android Export Preset
+      - name: Create Export Preset
         run: |
           cat > export_presets.cfg <<'EOF'
           [preset.0]
@@ -79,11 +67,6 @@ jobs:
 
           [preset.0.options]
 
-          custom_template/debug=""
-          custom_template/release=""
-
-          gradle_build/use_gradle_build=false
-
           package/unique_name="com.talpatarsepai.deerrunner"
           package/name="Deer Runner 3D"
 
@@ -98,8 +81,6 @@ jobs:
           screen/immersive_mode=true
           screen/orientation=1
 
-          package/signed=true
-
           keystore/debug="/home/runner/.android/debug.keystore"
           keystore/debug_user="androiddebugkey"
           keystore/debug_password="android"
@@ -108,28 +89,23 @@ jobs:
           keystore/release_user=""
           keystore/release_password=""
 
-          launcher_icons/main_192x192=""
-          launcher_icons/adaptive_foreground_432x432=""
-          launcher_icons/adaptive_background_432x432=""
-          launcher_icons/adaptive_monochrome_432x432=""
-
           permissions/internet=true
           EOF
 
-      - name: Verify Export Preset
+      - name: Install Export Templates
         run: |
-          echo "===== export_presets.cfg ====="
-          cat export_presets.cfg
-          echo "=============================="
-
-      - name: Import Project
-        run: |
-          godot --headless --editor --quit
+          mkdir -p ~/.local/share/godot/export_templates/4.3.stable
+          wget -q https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz
+          unzip -o Godot_v4.3-stable_export_templates.tpz -d /tmp/godot_templates
+          cp /tmp/godot_templates/templates/android_debug.apk ~/.local/share/godot/export_templates/4.3.stable/
+          cp /tmp/godot_templates/templates/android_release.apk ~/.local/share/godot/export_templates/4.3.stable/
+          cp /tmp/godot_templates/templates/android_source.zip ~/.local/share/godot/export_templates/4.3.stable/
 
       - name: Build APK
         run: |
           mkdir -p build
-          godot --headless --path . --export-release "Android" build/RunnerGame.apk
+          godot --headless --editor --quit
+          godot --headless --path . --export-debug "Android" build/RunnerGame.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

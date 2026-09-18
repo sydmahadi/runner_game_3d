@@ -62,7 +62,7 @@ jobs:
           log-accepted-android-sdk-licenses: false
 
 
-      # 6. Install Required Android SDK Packages
+      # 6. Install Android SDK Packages
       - name: Install Android SDK Packages
         run: |
           sdkmanager "platform-tools"
@@ -70,14 +70,33 @@ jobs:
           sdkmanager "build-tools;34.0.0"
 
 
-      # 7. Import Godot Project
+      # 7. Create Debug Keystore
+      - name: Create Debug Keystore
+        run: |
+          keytool -genkeypair \
+            -v \
+            -keystore "$GITHUB_WORKSPACE/debug.keystore" \
+            -alias androiddebugkey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+
+      # 8. Import Godot Project
       - name: Import Godot Project
         run: |
           godot --headless --editor --quit
 
 
-      # 8. Build Android APK
+      # 9. Build Android APK
       - name: Build APK
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
         run: |
           mkdir -p build
 
@@ -87,7 +106,13 @@ jobs:
             build/RunnerGame.apk
 
 
-      # 9. Upload APK
+      # 10. Check APK
+      - name: Check APK
+        run: |
+          ls -lh build/RunnerGame.apk
+
+
+      # 11. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:

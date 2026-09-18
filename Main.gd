@@ -1,96 +1,78 @@
 extends Node3D
 
 # ============================================================
-# RUNNER GAME 3D
-# Deer Endless Runner
+# DEER RUNNER 3D
 # Godot 4.3
 # ============================================================
 
-var player: Node3D
+var deer: Node3D
 var camera: Camera3D
 
-var player_lane: int = 0
+var current_lane: int = 0
 var target_x: float = 0.0
 
-var lane_width: float = 3.0
-var forward_speed: float = 10.0
+const LANE_WIDTH := 3.0
+const PLAYER_Z := 3.0
+const PLAYER_Y := 1.2
+
+var speed: float = 12.0
 
 var score: int = 0
-var coins: int = 0
+var coin_count: int = 0
 var game_over: bool = false
 
-var road_segments: Array[Node3D] = []
-var obstacles: Array[Node3D] = []
-var coins_nodes: Array[Node3D] = []
+var roads: Array[Node3D] = []
 var trees: Array[Node3D] = []
+var obstacles: Array[Node3D] = []
+var coins: Array[Node3D] = []
 
 var score_label: Label
 var coin_label: Label
-var game_over_panel: Control
+var game_over_box: Control
 
-var spawn_timer: float = 0.0
-var coin_spawn_timer: float = 0.0
+var obstacle_timer: float = 0.0
+var coin_timer: float = 0.0
 
-var touch_start: Vector2 = Vector2.ZERO
-var touch_active: bool = false
+var touch_start := Vector2.ZERO
+var touching := false
 
-const ROAD_LENGTH := 20.0
-const ROAD_SEGMENTS := 12
+const ROAD_SEGMENT_LENGTH := 20.0
+const ROAD_SEGMENTS := 16
 
-
-# ============================================================
-# READY
-# ============================================================
 
 func _ready() -> void:
-	_setup_environment()
+	_setup_world()
 	_setup_camera()
-	_create_world()
+	_create_road()
+	_create_environment_objects()
 	_create_deer()
 	_create_ui()
 
 
 # ============================================================
-# ENVIRONMENT
+# WORLD
 # ============================================================
 
-func _setup_environment() -> void:
+func _setup_world() -> void:
 
 	var environment := Environment.new()
 
 	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color(
-		0.38,
-		0.68,
-		0.92
-	)
+	environment.background_color = Color(0.38, 0.68, 0.92)
 
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	environment.ambient_light_color = Color(1.0, 1.0, 1.0)
+	environment.ambient_light_energy = 1.0
 
-	environment.ambient_light_color = Color(
-		0.8,
-		0.9,
-		1.0
-	)
+	var world := WorldEnvironment.new()
+	world.environment = environment
 
-	environment.ambient_light_energy = 0.8
-
-	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-
-	var world_environment := WorldEnvironment.new()
-	world_environment.environment = environment
-
-	add_child(world_environment)
+	add_child(world)
 
 	var sun := DirectionalLight3D.new()
 
-	sun.rotation_degrees = Vector3(
-		-55.0,
-		-25.0,
-		0.0
-	)
-
-	sun.light_energy = 1.2
+	sun.rotation_degrees = Vector3(-55.0, -30.0, 0.0)
+	sun.light_energy = 1.4
 	sun.shadow_enabled = true
 
 	add_child(sun)
@@ -104,56 +86,53 @@ func _setup_camera() -> void:
 
 	camera = Camera3D.new()
 
-	camera.position = Vector3(
-		0.0,
-		5.0,
-		10.0
-	)
+	camera.position = Vector3(0.0, 5.2, 10.5)
 
 	camera.rotation_degrees = Vector3(
-		-12.0,
+		-13.0,
 		0.0,
 		0.0
 	)
 
-	camera.current = true
 	camera.fov = 65.0
+	camera.current = true
 
 	add_child(camera)
 
 
 # ============================================================
-# WORLD
+# ROAD
 # ============================================================
 
-func _create_world() -> void:
+func _create_road() -> void:
 
 	# Grass
-	var grass := MeshInstance3D.new()
-	var grass_mesh := BoxMesh.new()
 
+	var grass := MeshInstance3D.new()
+
+	var grass_mesh := BoxMesh.new()
 	grass_mesh.size = Vector3(
-		30.0,
-		0.2,
-		300.0
+		35.0,
+		0.3,
+		350.0
 	)
 
 	grass.mesh = grass_mesh
-
 	grass.position = Vector3(
 		0.0,
-		-0.25,
-		-120.0
+		-0.3,
+		-160.0
 	)
 
-	grass.material_override = _material(
-		Color(0.10, 0.38, 0.14)
+	grass.material_override = _mat(
+		Color(0.10, 0.42, 0.14)
 	)
 
 	add_child(grass)
 
 
-	# Road
+	# Road segments
+
 	for i in range(ROAD_SEGMENTS):
 
 		var road := Node3D.new()
@@ -163,61 +142,50 @@ func _create_world() -> void:
 		road_mesh.size = Vector3(
 			10.0,
 			0.25,
-			ROAD_LENGTH
+			ROAD_SEGMENT_LENGTH
 		)
 
-		var road_part := MeshInstance3D.new()
+		var road_piece := MeshInstance3D.new()
 
-		road_part.mesh = road_mesh
+		road_piece.mesh = road_mesh
 
-		road_part.material_override = _material(
+		road_piece.material_override = _mat(
 			Color(0.08, 0.09, 0.10)
 		)
 
-		road.add_child(road_part)
+		road.add_child(road_piece)
 
 		road.position = Vector3(
 			0.0,
 			0.0,
-			-i * ROAD_LENGTH
+			-i * ROAD_SEGMENT_LENGTH
 		)
 
 		add_child(road)
 
-		road_segments.append(road)
+		roads.append(road)
 
 
-	# Lane markings
+	# Lane lines
+
 	for i in range(ROAD_SEGMENTS):
 
-		var z := -float(i) * ROAD_LENGTH
+		var z := -float(i) * ROAD_SEGMENT_LENGTH
 
 		_create_lane_line(
-			Vector3(-1.5, 0.14, z)
+			Vector3(-1.5, 0.16, z)
 		)
 
 		_create_lane_line(
-			Vector3(1.5, 0.14, z)
+			Vector3(1.5, 0.16, z)
 		)
 
 
-	# Side barriers
-	_create_side_barrier(-5.3)
-	_create_side_barrier(5.3)
+	# Road edges
 
+	_create_edge(-5.1)
+	_create_edge(5.1)
 
-	# Trees
-	for i in range(25):
-
-		var z := -float(i) * 12.0
-
-		_create_tree(-8.0, z)
-		_create_tree(8.0, z - 5.0)
-
-
-# ============================================================
-# LANE LINE
-# ============================================================
 
 func _create_lane_line(pos: Vector3) -> void:
 
@@ -228,49 +196,114 @@ func _create_lane_line(pos: Vector3) -> void:
 	mesh.size = Vector3(
 		0.08,
 		0.05,
-		7.0
+		8.0
 	)
 
 	line.mesh = mesh
-
 	line.position = pos
 
-	line.material_override = _material(
-		Color(0.9, 0.9, 0.7)
+	line.material_override = _mat(
+		Color(0.9, 0.9, 0.75)
 	)
 
 	add_child(line)
 
 
-# ============================================================
-# SIDE BARRIER
-# ============================================================
+func _create_edge(x: float) -> void:
 
-func _create_side_barrier(x: float) -> void:
-
-	var barrier := MeshInstance3D.new()
+	var edge := MeshInstance3D.new()
 
 	var mesh := BoxMesh.new()
 
 	mesh.size = Vector3(
 		0.25,
-		0.8,
-		300.0
+		0.7,
+		320.0
 	)
 
-	barrier.mesh = mesh
+	edge.mesh = mesh
 
-	barrier.position = Vector3(
+	edge.position = Vector3(
 		x,
-		0.35,
-		-120.0
+		0.3,
+		-150.0
 	)
 
-	barrier.material_override = _material(
-		Color(0.65, 0.65, 0.65)
+	edge.material_override = _mat(
+		Color(0.55, 0.55, 0.55)
 	)
 
-	add_child(barrier)
+	add_child(edge)
+
+
+# ============================================================
+# TREES
+# ============================================================
+
+func _create_environment_objects() -> void:
+
+	for i in range(30):
+
+		var z := -float(i) * 11.0
+
+		_create_tree(-8.0, z)
+		_create_tree(8.0, z - 5.0)
+
+
+func _create_tree(x: float, z: float) -> void:
+
+	var tree := Node3D.new()
+
+	tree.position = Vector3(
+		x,
+		0.0,
+		z
+	)
+
+	add_child(tree)
+
+
+	# trunk
+
+	var trunk := MeshInstance3D.new()
+
+	var trunk_mesh := CylinderMesh.new()
+
+	trunk_mesh.top_radius = 0.22
+	trunk_mesh.bottom_radius = 0.32
+	trunk_mesh.height = 2.8
+
+	trunk.mesh = trunk_mesh
+
+	trunk.position.y = 1.4
+
+	trunk.material_override = _mat(
+		Color(0.30, 0.16, 0.07)
+	)
+
+	tree.add_child(trunk)
+
+
+	# leaves
+
+	var leaves := MeshInstance3D.new()
+
+	var leaves_mesh := SphereMesh.new()
+
+	leaves_mesh.radius = 1.4
+	leaves_mesh.height = 2.8
+
+	leaves.mesh = leaves_mesh
+
+	leaves.position.y = 3.2
+
+	leaves.material_override = _mat(
+		Color(0.04, 0.32, 0.08)
+	)
+
+	tree.add_child(leaves)
+
+	trees.append(tree)
 
 
 # ============================================================
@@ -279,219 +312,226 @@ func _create_side_barrier(x: float) -> void:
 
 func _create_deer() -> void:
 
-	player = Node3D.new()
+	deer = Node3D.new()
 
-	player.name = "Deer"
+	deer.name = "Deer"
 
-	player.position = Vector3(
+	deer.position = Vector3(
 		0.0,
-		1.15,
-		2.0
+		PLAYER_Y,
+		PLAYER_Z
 	)
 
-	add_child(player)
+	add_child(deer)
 
 
-	# -------------------------
 	# BODY
-	# -------------------------
 
 	var body := MeshInstance3D.new()
 
 	var body_mesh := CapsuleMesh.new()
 
-	body_mesh.radius = 0.55
-	body_mesh.height = 1.8
+	body_mesh.radius = 0.58
+	body_mesh.height = 1.9
 
 	body.mesh = body_mesh
 
 	body.rotation_degrees = Vector3(
-		0,
-		0,
-		90
+		0.0,
+		0.0,
+		90.0
 	)
 
 	body.position = Vector3(
-		0,
-		0.15,
-		0
+		0.0,
+		0.0,
+		0.0
 	)
 
-	body.material_override = _material(
-		Color(0.48, 0.25, 0.10)
+	body.material_override = _mat(
+		Color(0.50, 0.27, 0.11)
 	)
 
-	player.add_child(body)
+	deer.add_child(body)
 
 
-	# -------------------------
+	# CHEST
+
+	var chest := MeshInstance3D.new()
+
+	var chest_mesh := SphereMesh.new()
+
+	chest_mesh.radius = 0.55
+	chest_mesh.height = 1.1
+
+	chest.mesh = chest_mesh
+
+	chest.position = Vector3(
+		0.0,
+		0.05,
+		-0.55
+	)
+
+	chest.scale = Vector3(
+		1.0,
+		1.25,
+		1.0
+	)
+
+	chest.material_override = _mat(
+		Color(0.52, 0.29, 0.12)
+	)
+
+	deer.add_child(chest)
+
+
 	# NECK
-	# -------------------------
 
 	var neck := MeshInstance3D.new()
 
 	var neck_mesh := CylinderMesh.new()
 
-	neck_mesh.top_radius = 0.28
+	neck_mesh.top_radius = 0.25
 	neck_mesh.bottom_radius = 0.38
-	neck_mesh.height = 1.3
+	neck_mesh.height = 1.35
 
 	neck.mesh = neck_mesh
 
-	neck.rotation_degrees = Vector3(
-		-25,
-		0,
-		0
-	)
-
 	neck.position = Vector3(
-		0,
-		0.85,
-		-0.55
+		0.0,
+		0.82,
+		-0.62
 	)
 
-	neck.material_override = _material(
+	neck.rotation_degrees = Vector3(
+		-18.0,
+		0.0,
+		0.0
+	)
+
+	neck.material_override = _mat(
 		Color(0.50, 0.27, 0.11)
 	)
 
-	player.add_child(neck)
+	deer.add_child(neck)
 
 
-	# -------------------------
 	# HEAD
-	# -------------------------
 
 	var head := MeshInstance3D.new()
 
 	var head_mesh := SphereMesh.new()
 
-	head_mesh.radius = 0.42
-	head_mesh.height = 0.75
+	head_mesh.radius = 0.43
+	head_mesh.height = 0.78
 
 	head.mesh = head_mesh
 
 	head.position = Vector3(
-		0,
-		1.35,
-		-0.95
+		0.0,
+		1.42,
+		-1.02
 	)
 
-	head.material_override = _material(
-		Color(0.52, 0.28, 0.12)
+	head.material_override = _mat(
+		Color(0.54, 0.30, 0.13)
 	)
 
-	player.add_child(head)
+	deer.add_child(head)
 
 
-	# -------------------------
-	# SNOUT
-	# -------------------------
+	# MUZZLE
 
-	var snout := MeshInstance3D.new()
+	var muzzle := MeshInstance3D.new()
 
-	var snout_mesh := SphereMesh.new()
+	var muzzle_mesh := SphereMesh.new()
 
-	snout_mesh.radius = 0.25
-	snout_mesh.height = 0.45
+	muzzle_mesh.radius = 0.25
+	muzzle_mesh.height = 0.40
 
-	snout.mesh = snout_mesh
+	muzzle.mesh = muzzle_mesh
 
-	snout.position = Vector3(
-		0,
-		1.28,
-		-1.28
+	muzzle.position = Vector3(
+		0.0,
+		1.30,
+		-1.36
 	)
 
-	snout.material_override = _material(
-		Color(0.35, 0.16, 0.07)
+	muzzle.material_override = _mat(
+		Color(0.30, 0.14, 0.06)
 	)
 
-	player.add_child(snout)
+	deer.add_child(muzzle)
 
 
-	# -------------------------
 	# EARS
-	# -------------------------
 
-	_create_deer_ear(
-		Vector3(-0.28, 1.7, -0.85),
-		-20
+	_create_ear(
+		Vector3(-0.30, 1.70, -0.95),
+		-25.0
 	)
 
-	_create_deer_ear(
-		Vector3(0.28, 1.7, -0.85),
-		20
+	_create_ear(
+		Vector3(0.30, 1.70, -0.95),
+		25.0
 	)
 
 
-	# -------------------------
 	# ANTLERS
-	# -------------------------
 
 	_create_antler(
-		Vector3(-0.22, 1.72, -0.92)
+		Vector3(-0.22, 1.78, -0.95)
 	)
 
 	_create_antler(
-		Vector3(0.22, 1.72, -0.92)
+		Vector3(0.22, 1.78, -0.95)
 	)
 
 
-	# -------------------------
 	# LEGS
-	# -------------------------
 
-	_create_deer_leg(
-		Vector3(-0.38, -0.75, -0.35)
+	_create_leg(
+		Vector3(-0.38, -0.70, -0.38)
 	)
 
-	_create_deer_leg(
-		Vector3(0.38, -0.75, -0.35)
+	_create_leg(
+		Vector3(0.38, -0.70, -0.38)
 	)
 
-	_create_deer_leg(
-		Vector3(-0.38, -0.75, 0.35)
+	_create_leg(
+		Vector3(-0.38, -0.70, 0.38)
 	)
 
-	_create_deer_leg(
-		Vector3(0.38, -0.75, 0.35)
+	_create_leg(
+		Vector3(0.38, -0.70, 0.38)
 	)
 
 
-	# -------------------------
 	# TAIL
-	# -------------------------
 
 	var tail := MeshInstance3D.new()
 
 	var tail_mesh := SphereMesh.new()
 
-	tail_mesh.radius = 0.22
-	tail_mesh.height = 0.35
+	tail_mesh.radius = 0.24
+	tail_mesh.height = 0.38
 
 	tail.mesh = tail_mesh
 
 	tail.position = Vector3(
-		0,
+		0.0,
 		0.55,
-		0.9
+		0.95
 	)
 
-	tail.material_override = _material(
-		Color(0.75, 0.65, 0.45)
+	tail.material_override = _mat(
+		Color(0.80, 0.70, 0.52)
 	)
 
-	player.add_child(tail)
+	deer.add_child(tail)
 
 
-# ============================================================
-# DEER EAR
-# ============================================================
-
-func _create_deer_ear(
-	pos: Vector3,
-	angle: float
-) -> void:
+func _create_ear(pos: Vector3, angle: float) -> void:
 
 	var ear := MeshInstance3D.new()
 
@@ -500,7 +540,7 @@ func _create_deer_ear(
 	mesh.size = Vector3(
 		0.18,
 		0.55,
-		0.08
+		0.10
 	)
 
 	ear.mesh = mesh
@@ -508,21 +548,17 @@ func _create_deer_ear(
 	ear.position = pos
 
 	ear.rotation_degrees = Vector3(
-		0,
-		0,
+		0.0,
+		0.0,
 		angle
 	)
 
-	ear.material_override = _material(
-		Color(0.45, 0.20, 0.08)
+	ear.material_override = _mat(
+		Color(0.43, 0.19, 0.07)
 	)
 
-	player.add_child(ear)
+	deer.add_child(ear)
 
-
-# ============================================================
-# ANTLER
-# ============================================================
 
 func _create_antler(pos: Vector3) -> void:
 
@@ -530,42 +566,66 @@ func _create_antler(pos: Vector3) -> void:
 
 	antler.position = pos
 
-	player.add_child(antler)
+	deer.add_child(antler)
+
 
 	var main := MeshInstance3D.new()
 
-	var main_mesh := CylinderMesh.new()
+	var mesh := CylinderMesh.new()
 
-	main_mesh.top_radius = 0.04
-	main_mesh.bottom_radius = 0.06
-	main_mesh.height = 0.65
+	mesh.top_radius = 0.035
+	mesh.bottom_radius = 0.065
+	mesh.height = 0.75
 
-	main.mesh = main_mesh
+	main.mesh = mesh
 
-	main.position = Vector3(
-		0,
-		0.28,
-		0
-	)
+	main.position.y = 0.35
 
 	main.rotation_degrees = Vector3(
-		-15,
-		0,
-		0
+		-12.0,
+		0.0,
+		0.0
 	)
 
-	main.material_override = _material(
-		Color(0.65, 0.48, 0.25)
+	main.material_override = _mat(
+		Color(0.62, 0.45, 0.22)
 	)
 
 	antler.add_child(main)
 
 
-# ============================================================
-# DEER LEG
-# ============================================================
+	# antler branches
 
-func _create_deer_leg(pos: Vector3) -> void:
+	var branch := MeshInstance3D.new()
+
+	var branch_mesh := CylinderMesh.new()
+
+	branch_mesh.top_radius = 0.025
+	branch_mesh.bottom_radius = 0.045
+	branch_mesh.height = 0.35
+
+	branch.mesh = branch_mesh
+
+	branch.position = Vector3(
+		0.0,
+		0.48,
+		0.0
+	)
+
+	branch.rotation_degrees = Vector3(
+		0.0,
+		0.0,
+		-45.0
+	)
+
+	branch.material_override = _mat(
+		Color(0.62, 0.45, 0.22)
+	)
+
+	antler.add_child(branch)
+
+
+func _create_leg(pos: Vector3) -> void:
 
 	var leg := MeshInstance3D.new()
 
@@ -573,80 +633,17 @@ func _create_deer_leg(pos: Vector3) -> void:
 
 	mesh.top_radius = 0.13
 	mesh.bottom_radius = 0.09
-	mesh.height = 1.0
+	mesh.height = 1.05
 
 	leg.mesh = mesh
 
 	leg.position = pos
 
-	leg.material_override = _material(
-		Color(0.38, 0.18, 0.07)
+	leg.material_override = _mat(
+		Color(0.37, 0.17, 0.06)
 	)
 
-	player.add_child(leg)
-
-
-# ============================================================
-# TREE
-# ============================================================
-
-func _create_tree(x: float, z: float) -> void:
-
-	var tree := Node3D.new()
-
-	tree.position = Vector3(
-		x,
-		0,
-		z
-	)
-
-	add_child(tree)
-
-	var trunk := MeshInstance3D.new()
-
-	var trunk_mesh := CylinderMesh.new()
-
-	trunk_mesh.top_radius = 0.22
-	trunk_mesh.bottom_radius = 0.32
-	trunk_mesh.height = 2.5
-
-	trunk.mesh = trunk_mesh
-
-	trunk.position = Vector3(
-		0,
-		1.25,
-		0
-	)
-
-	trunk.material_override = _material(
-		Color(0.30, 0.16, 0.07)
-	)
-
-	tree.add_child(trunk)
-
-
-	var leaves := MeshInstance3D.new()
-
-	var leaves_mesh := SphereMesh.new()
-
-	leaves_mesh.radius = 1.3
-	leaves_mesh.height = 2.6
-
-	leaves.mesh = leaves_mesh
-
-	leaves.position = Vector3(
-		0,
-		3.0,
-		0
-	)
-
-	leaves.material_override = _material(
-		Color(0.05, 0.35, 0.10)
-	)
-
-	tree.add_child(leaves)
-
-	trees.append(tree)
+	deer.add_child(leg)
 
 
 # ============================================================
@@ -660,12 +657,13 @@ func _spawn_obstacle() -> void:
 	var lane := randi_range(-1, 1)
 
 	obstacle.position = Vector3(
-		lane * lane_width,
+		lane * LANE_WIDTH,
 		0.9,
-		-110.0
+		-120.0
 	)
 
 	add_child(obstacle)
+
 
 	var block := MeshInstance3D.new()
 
@@ -674,16 +672,19 @@ func _spawn_obstacle() -> void:
 	mesh.size = Vector3(
 		1.8,
 		1.8,
-		1.4
+		1.5
 	)
 
 	block.mesh = mesh
 
-	block.material_override = _material(
-		Color(0.80, 0.10, 0.08)
+	block.material_override = _mat(
+		Color(0.80, 0.08, 0.06)
 	)
 
 	obstacle.add_child(block)
+
+
+	# yellow stripe
 
 	var stripe := MeshInstance3D.new()
 
@@ -691,23 +692,20 @@ func _spawn_obstacle() -> void:
 
 	stripe_mesh.size = Vector3(
 		1.9,
-		0.25,
-		1.5
+		0.22,
+		1.55
 	)
 
 	stripe.mesh = stripe_mesh
 
-	stripe.position = Vector3(
-		0,
-		0.3,
-		-0.72
-	)
+	stripe.position.y = 0.25
 
-	stripe.material_override = _material(
-		Color(1.0, 0.75, 0.05)
+	stripe.material_override = _mat(
+		Color(1.0, 0.72, 0.05)
 	)
 
 	obstacle.add_child(stripe)
+
 
 	obstacles.append(obstacle)
 
@@ -723,36 +721,37 @@ func _spawn_coin() -> void:
 	var lane := randi_range(-1, 1)
 
 	coin.position = Vector3(
-		lane * lane_width,
+		lane * LANE_WIDTH,
 		1.5,
-		-110.0
+		-120.0
 	)
 
 	add_child(coin)
 
-	var mesh_instance := MeshInstance3D.new()
+
+	var coin_mesh := MeshInstance3D.new()
 
 	var mesh := CylinderMesh.new()
 
 	mesh.top_radius = 0.45
 	mesh.bottom_radius = 0.45
-	mesh.height = 0.12
+	mesh.height = 0.14
 
-	mesh_instance.mesh = mesh
+	coin_mesh.mesh = mesh
 
-	mesh_instance.rotation_degrees = Vector3(
-		90,
-		0,
-		0
+	coin_mesh.rotation_degrees = Vector3(
+		90.0,
+		0.0,
+		0.0
 	)
 
-	mesh_instance.material_override = _material(
+	coin_mesh.material_override = _mat(
 		Color(1.0, 0.72, 0.05)
 	)
 
-	coin.add_child(mesh_instance)
+	coin.add_child(coin_mesh)
 
-	coins_nodes.append(coin)
+	coins.append(coin)
 
 
 # ============================================================
@@ -766,17 +765,13 @@ func _create_ui() -> void:
 	add_child(canvas)
 
 
-	# -------------------------
-	# SCORE
-	# -------------------------
-
 	score_label = Label.new()
 
 	score_label.text = "SCORE  0"
 
 	score_label.position = Vector2(
-		20,
-		20
+		20.0,
+		20.0
 	)
 
 	score_label.add_theme_font_size_override(
@@ -787,17 +782,13 @@ func _create_ui() -> void:
 	canvas.add_child(score_label)
 
 
-	# -------------------------
-	# COINS
-	# -------------------------
-
 	coin_label = Label.new()
 
 	coin_label.text = "COINS  0"
 
 	coin_label.position = Vector2(
-		20,
-		60
+		20.0,
+		60.0
 	)
 
 	coin_label.add_theme_font_size_override(
@@ -808,95 +799,87 @@ func _create_ui() -> void:
 	canvas.add_child(coin_label)
 
 
-	# -------------------------
 	# GAME OVER
-	# -------------------------
 
-	game_over_panel = Control.new()
+	game_over_box = Control.new()
 
-	game_over_panel.visible = false
+	game_over_box.visible = false
 
-	game_over_panel.set_anchors_and_offsets_preset(
+	game_over_box.set_anchors_and_offsets_preset(
 		Control.PRESET_FULL_RECT
 	)
 
-	canvas.add_child(game_over_panel)
+	canvas.add_child(game_over_box)
 
 
-	var background := ColorRect.new()
+	var dark := ColorRect.new()
 
-	background.color = Color(
-		0.02,
-		0.02,
-		0.02,
-		0.82
+	dark.color = Color(
+		0.0,
+		0.0,
+		0.0,
+		0.80
 	)
 
-	background.set_anchors_and_offsets_preset(
+	dark.set_anchors_and_offsets_preset(
 		Control.PRESET_FULL_RECT
 	)
 
-	game_over_panel.add_child(background)
+	game_over_box.add_child(dark)
 
 
 	var title := Label.new()
-
-	title.name = "GameOverTitle"
 
 	title.text = "GAME OVER"
 
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	title.position = Vector2(
-		0,
-		430
+		0.0,
+		400.0
 	)
 
 	title.size = Vector2(
-		360,
-		60
+		360.0,
+		70.0
 	)
 
 	title.add_theme_font_size_override(
 		"font_size",
-		34
+		36
 	)
 
-	game_over_panel.add_child(title)
+	game_over_box.add_child(title)
 
 
-	# -------------------------
-	# RESTART BUTTON
-	# -------------------------
+	var restart := Button.new()
 
-	var restart_button := Button.new()
+	restart.text = "RESTART"
 
-	restart_button.name = "RestartButton"
-
-	restart_button.text = "RESTART"
-
-	restart_button.position = Vector2(
-		105,
-		510
+	restart.position = Vector2(
+		95.0,
+		500.0
 	)
 
-	restart_button.size = Vector2(
-		150,
-		65
+	restart.size = Vector2(
+		170.0,
+		65.0
 	)
 
-	restart_button.add_theme_font_size_override(
+	restart.add_theme_font_size_override(
 		"font_size",
 		24
 	)
 
-	restart_button.pressed.connect(_restart_game)
+	restart.pressed.connect(
+		_restart_game
+	)
 
-	game_over_panel.add_child(restart_button)
+	game_over_box.add_child(restart)
 
 
 # ============================================================
-# TOUCH / SWIPE
+# TOUCH / KEYBOARD
 # ============================================================
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -911,83 +894,72 @@ func _unhandled_input(event: InputEvent) -> void:
 
 			touch_start = event.position
 
-			touch_active = true
+			touching = true
 
 		else:
 
-			if touch_active:
+			if touching:
 
-				var swipe_distance := event.position.x - touch_start.x
+				var distance := (
+					event.position.x -
+					touch_start.x
+				)
 
-				if abs(swipe_distance) > 60:
+				if abs(distance) > 50.0:
 
-					if swipe_distance < 0:
-
+					if distance < 0.0:
 						_move_left()
-
 					else:
-
 						_move_right()
 
-			touch_active = false
+			touching = false
 
 
-	# Keyboard testing
 	if event is InputEventKey:
 
 		if event.pressed:
 
 			if event.keycode == KEY_LEFT:
-
 				_move_left()
 
 			elif event.keycode == KEY_RIGHT:
-
 				_move_right()
 
-
-# ============================================================
-# MOVE LEFT
-# ============================================================
 
 func _move_left() -> void:
 
 	if game_over:
 		return
 
-	player_lane -= 1
+	current_lane -= 1
 
-	player_lane = clamp(
-		player_lane,
+	current_lane = clamp(
+		current_lane,
 		-1,
 		1
 	)
 
-	target_x = player_lane * lane_width
+	target_x = current_lane * LANE_WIDTH
 
-
-# ============================================================
-# MOVE RIGHT
-# ============================================================
 
 func _move_right() -> void:
 
 	if game_over:
 		return
 
-	player_lane += 1
+	current_lane += 1
 
-	player_lane = clamp(
-		player_lane,
+	current_lane = clamp(
+		current_lane,
 		-1,
 		1
 	)
 
-	target_x = player_lane * lane_width
+	target_x = current_lane * LANE_WIDTH
 
 
 # ============================================================
-# PROCESS
+# GAME LOOP
 # ============================================================
 
 func _process(delta: float) -> void:
@@ -997,94 +969,117 @@ func _process(delta: float) -> void:
 
 
 	# Deer movement
-	if player:
 
-		player.position.x = lerp(
-			player.position.x,
+	if deer:
+
+		deer.position.x = lerp(
+			deer.position.x,
 			target_x,
 			10.0 * delta
 		)
 
-		# Small running movement
-		player.position.y = 1.15 + sin(
-			Time.get_ticks_msec() * 0.012
-		) * 0.06
+		deer.position.y = (
+			PLAYER_Y +
+			sin(Time.get_ticks_msec() * 0.012) * 0.05
+		)
 
 
-	# Road
-	for road in road_segments:
+	# Road movement
 
-		road.position.z += forward_speed * delta
+	for road in roads:
 
-		if road.position.z > 15.0:
+		if not is_instance_valid(road):
+			continue
+
+		road.position.z += speed * delta
+
+		if road.position.z > 20.0:
 
 			road.position.z -= (
-				ROAD_LENGTH * ROAD_SEGMENTS
+				ROAD_SEGMENT_LENGTH *
+				ROAD_SEGMENTS
 			)
 
 
 	# Trees
+
 	for tree in trees:
 
-		tree.position.z += forward_speed * delta
+		if not is_instance_valid(tree):
+			continue
 
-		if tree.position.z > 15.0:
+		tree.position.z += speed * delta
 
-			tree.position.z -= 300.0
+		if tree.position.z > 20.0:
+
+			tree.position.z -= 330.0
 
 
 	# Obstacles
+
 	for obstacle in obstacles:
 
-		if is_instance_valid(obstacle):
+		if not is_instance_valid(obstacle):
+			continue
 
-			obstacle.position.z += forward_speed * delta
+		obstacle.position.z += speed * delta
 
-			if obstacle.position.z > 15.0:
+		if obstacle.position.z > 20.0:
 
-				obstacle.queue_free()
+			obstacle.queue_free()
 
 
 	# Coins
-	for coin in coins_nodes:
 
-		if is_instance_valid(coin):
+	for coin in coins:
 
-			coin.position.z += forward_speed * delta
+		if not is_instance_valid(coin):
+			continue
 
-			coin.rotation.y += 5.0 * delta
+		coin.position.z += speed * delta
 
-			if coin.position.z > 15.0:
+		coin.rotation.y += 5.0 * delta
 
-				coin.queue_free()
+		if coin.position.z > 20.0:
+
+			coin.queue_free()
 
 
 	# Spawn obstacle
-	spawn_timer += delta
 
-	if spawn_timer > 1.8:
+	obstacle_timer += delta
 
-		spawn_timer = 0.0
+	if obstacle_timer >= 1.7:
+
+		obstacle_timer = 0.0
 
 		_spawn_obstacle()
 
 
-	# Spawn coin
-	coin_spawn_timer += delta
+	# Spawn coins
 
-	if coin_spawn_timer > 1.0:
+	coin_timer += delta
 
-		coin_spawn_timer = 0.0
+	if coin_timer >= 0.8:
+
+		coin_timer = 0.0
 
 		_spawn_coin()
 
 
 	# Score
+
 	score += int(delta * 10.0)
 
-	score_label.text = "SCORE  " + str(score)
+	score_label.text = (
+		"SCORE  " +
+		str(score)
+	)
 
-	coin_label.text = "COINS  " + str(coins)
+	coin_label.text = (
+		"COINS  " +
+		str(coin_count)
+	)
 
 
 	_check_collisions()
@@ -1096,7 +1091,7 @@ func _process(delta: float) -> void:
 
 func _check_collisions() -> void:
 
-	if player == null:
+	if deer == null:
 		return
 
 
@@ -1105,27 +1100,33 @@ func _check_collisions() -> void:
 		if not is_instance_valid(obstacle):
 			continue
 
-		var distance := player.global_position.distance_to(
-			obstacle.global_position
+		var distance := (
+			deer.global_position.distance_to(
+				obstacle.global_position
+			)
 		)
 
-		if distance < 1.5:
+		if distance < 1.55:
 
 			_game_over()
 
+			return
 
-	for coin in coins_nodes:
+
+	for coin in coins:
 
 		if not is_instance_valid(coin):
 			continue
 
-		var distance := player.global_position.distance_to(
-			coin.global_position
+		var distance := (
+			deer.global_position.distance_to(
+				coin.global_position
+			)
 		)
 
-		if distance < 1.3:
+		if distance < 1.30:
 
-			coins += 1
+			coin_count += 1
 
 			coin.queue_free()
 
@@ -1138,12 +1139,8 @@ func _game_over() -> void:
 
 	game_over = true
 
-	game_over_panel.visible = true
+	game_over_box.visible = true
 
-
-# ============================================================
-# RESTART
-# ============================================================
 
 func _restart_game() -> void:
 
@@ -1154,7 +1151,7 @@ func _restart_game() -> void:
 # MATERIAL
 # ============================================================
 
-func _material(color: Color) -> StandardMaterial3D:
+func _mat(color: Color) -> StandardMaterial3D:
 
 	var material := StandardMaterial3D.new()
 

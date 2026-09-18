@@ -20,6 +20,20 @@ jobs:
           version: "4.3.0"
           use-dotnet: false
 
+      - name: Install Android Export Templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates/4.3.stable
+          wget -O /tmp/templates.tpz \
+            https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz
+          unzip -o /tmp/templates.tpz \
+            -d ~/.local/share/godot/export_templates/4.3.stable/
+          
+          if [ -d ~/.local/share/godot/export_templates/4.3.stable/templates ]; then
+            mv ~/.local/share/godot/export_templates/4.3.stable/templates/* \
+              ~/.local/share/godot/export_templates/4.3.stable/
+            rmdir ~/.local/share/godot/export_templates/4.3.stable/templates
+          fi
+
       - name: Import Project
         run: |
           godot --headless --editor --quit
@@ -27,7 +41,10 @@ jobs:
       - name: Build APK
         run: |
           mkdir -p build
-          godot --headless --path . --export-release "Android" build/RunnerGame.apk
+          godot --headless \
+            --path . \
+            --export-release "Android" \
+            build/RunnerGame.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

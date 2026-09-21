@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Bubble Shooter APK
 
 on:
   workflow_dispatch:
@@ -15,7 +15,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -86,18 +86,18 @@ jobs:
           export_filter="all_resources"
           include_filter=""
           exclude_filter=""
-          export_path="build/RunnerGame.apk"
+          export_path="build/BubbleShooter.apk"
 
           [preset.0.options]
 
-          package/unique_name="com.talpatarsepai.deerrunner"
-          package/name="Deer Runner 3D"
+          package/unique_name="com.talpatarsepai.bubbleshooter"
+          package/name="Bubble Shooter"
 
           version/code=1
           version/name="1.0"
 
-          architecture/armeabi-v7a=false
           architecture/arm64-v8a=true
+          architecture/armeabi-v7a=false
           architecture/x86=false
           architecture/x86_64=false
 
@@ -111,8 +111,6 @@ jobs:
           keystore/release=""
           keystore/release_user=""
           keystore/release_password=""
-
-          permissions/internet=true
           EOF
 
       - name: Import Project
@@ -122,16 +120,10 @@ jobs:
       - name: Build APK
         run: |
           mkdir -p build
-
-          godot \
-            --headless \
-            --path . \
-            --export-debug \
-            "Android" \
-            build/RunnerGame.apk
+          godot --headless --path . --export-debug "Android" build/BubbleShooter.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Runner-Game-APK
-          path: build/RunnerGame.apk
+          name: Bubble-Shooter-APK
+          path: build/BubbleShooter.apk

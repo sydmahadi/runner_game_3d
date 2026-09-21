@@ -15,17 +15,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-
-      - name: Setup Godot
-        uses: chickensoft-games/setup-godot@v2
-        with:
-          version: "4.3.0"
-          use-dotnet: false
 
       - name: Setup Android
         uses: android-actions/setup-android@v3
@@ -37,6 +31,32 @@ jobs:
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-34"
           sdkmanager "build-tools;34.0.0"
+
+      - name: Setup Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: "4.3.0"
+          use-dotnet: false
+
+      - name: Install Export Templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates/4.3.stable
+
+          wget -q \
+            https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz
+
+          unzip -o \
+            Godot_v4.3-stable_export_templates.tpz \
+            -d /tmp/godot_templates
+
+          cp /tmp/godot_templates/templates/android_debug.apk \
+            ~/.local/share/godot/export_templates/4.3.stable/
+
+          cp /tmp/godot_templates/templates/android_release.apk \
+            ~/.local/share/godot/export_templates/4.3.stable/
+
+          cp /tmp/godot_templates/templates/android_source.zip \
+            ~/.local/share/godot/export_templates/4.3.stable/
 
       - name: Create Debug Keystore
         run: |
@@ -54,76 +74,37 @@ jobs:
             -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
 
-      - name: Install Export Templates
+      - name: Check Project
         run: |
-          mkdir -p ~/.local/share/godot/export_templates/4.3.stable
+          echo "===== PROJECT FILES ====="
+          find . -maxdepth 2 -type f
+          echo "========================="
 
-          wget -q https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz
-
-          unzip -o Godot_v4.3-stable_export_templates.tpz \
-            -d /tmp/godot_templates
-
-          cp /tmp/godot_templates/templates/android_debug.apk \
-            ~/.local/share/godot/export_templates/4.3.stable/
-
-          cp /tmp/godot_templates/templates/android_release.apk \
-            ~/.local/share/godot/export_templates/4.3.stable/
-
-          cp /tmp/godot_templates/templates/android_source.zip \
-            ~/.local/share/godot/export_templates/4.3.stable/
-
-      - name: Create Export Preset
-        run: |
-          cat > export_presets.cfg <<'EOF'
-          [preset.0]
-
-          name="Android"
-          platform="Android"
-          runnable=true
-          advanced_options=false
-          dedicated_server=false
-          custom_features=""
-          export_filter="all_resources"
-          include_filter=""
-          exclude_filter=""
-          export_path="build/BubbleShooter.apk"
-
-          [preset.0.options]
-
-          package/unique_name="com.talpatarsepai.bubbleshooter"
-          package/name="Bubble Shooter"
-
-          version/code=1
-          version/name="1.0"
-
-          architecture/arm64-v8a=true
-          architecture/armeabi-v7a=false
-          architecture/x86=false
-          architecture/x86_64=false
-
-          screen/immersive_mode=true
-          screen/orientation=1
-
-          keystore/debug="/home/runner/.android/debug.keystore"
-          keystore/debug_user="androiddebugkey"
-          keystore/debug_password="android"
-
-          keystore/release=""
-          keystore/release_user=""
-          keystore/release_password=""
-          EOF
-
-      - name: Import Project
+      - name: Import Godot Project
         run: |
           godot --headless --editor --quit
 
-      - name: Build APK
+      - name: Build Android
         run: |
           mkdir -p build
-          godot --headless --path . --export-debug "Android" build/BubbleShooter.apk
+
+          godot \
+            --headless \
+            --path . \
+            --export-debug \
+            "Android" \
+            build/BubbleShooter.apk
+
+      - name: Show Build Files
+        if: always()
+        run: |
+          echo "===== BUILD DIRECTORY ====="
+          ls -lah build || true
+          echo "==========================="
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: Bubble-Shooter-APK
           path: build/BubbleShooter.apk

@@ -20,12 +20,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android SDK Licenses
+      - name: Setup Android SDK Path & Accept Licenses
         run: |
-          yes | y2=$'y\n' $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Generate Debug Keystore
         run: |
@@ -37,7 +35,7 @@ jobs:
           GODOT_VERSION="4.3"
           GODOT_RELEASE="stable"
           
-          # Download Godot Engine Executable
+          # Download Godot Engine
           wget https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-${GODOT_RELEASE}/Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_linux.x86_64.zip
           unzip Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_linux.x86_64.zip
           mv Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_linux.x86_64 godot

@@ -12,52 +12,37 @@ jobs:
 
     steps:
 
+      # 1. Checkout project
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+
+      # 2. Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
+
+      # 3. Setup Android SDK
       - name: Setup Android
         uses: android-actions/setup-android@v3
         with:
           packages: ""
 
+
+      # 4. Install Android SDK components
       - name: Install Android SDK
         run: |
+          yes | sdkmanager --licenses || true
+
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-34"
           sdkmanager "build-tools;34.0.0"
 
-      - name: Setup Godot
-        uses: chickensoft-games/setup-godot@v2
-        with:
-          version: "4.3.0"
-          use-dotnet: false
 
-      - name: Install Export Templates
-        run: |
-          mkdir -p ~/.local/share/godot/export_templates/4.3.stable
-
-          wget -q \
-            https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz
-
-          unzip -o \
-            Godot_v4.3-stable_export_templates.tpz \
-            -d /tmp/godot_templates
-
-          cp /tmp/godot_templates/templates/android_debug.apk \
-            ~/.local/share/godot/export_templates/4.3.stable/
-
-          cp /tmp/godot_templates/templates/android_release.apk \
-            ~/.local/share/godot/export_templates/4.3.stable/
-
-          cp /tmp/godot_templates/templates/android_source.zip \
-            ~/.local/share/godot/export_templates/4.3.stable/
-
+      # 5. Create Android debug keystore
       - name: Create Debug Keystore
         run: |
           mkdir -p ~/.android
@@ -74,37 +59,93 @@ jobs:
             -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
 
+
+      # 6. Setup Godot 4.3
+      - name: Setup Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: "4.3.0"
+          use-dotnet: false
+
+
+      # 7. Install Godot Android export templates
+      - name: Install Godot Export Templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates/4.3.stable
+
+          wget -q \
+            https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz \
+            -O templates.tpz
+
+          mkdir -p /tmp/godot_templates
+
+          unzip -o templates.tpz \
+            -d /tmp/godot_templates
+
+          cp /tmp/godot_templates/templates/android_debug.apk \
+            ~/.local/share/godot/export_templates/4.3.stable/
+
+          cp /tmp/godot_templates/templates/android_release.apk \
+            ~/.local/share/godot/export_templates/4.3.stable/
+
+          cp /tmp/godot_templates/templates/android_source.zip \
+            ~/.local/share/godot/export_templates/4.3.stable/
+
+
+      # 8. Check project files
       - name: Check Project
         run: |
           echo "===== PROJECT FILES ====="
-          find . -maxdepth 2 -type f
-          echo "========================="
+          ls -la
 
-      - name: Import Godot Project
+          echo "===== WORKFLOW ====="
+          ls -la .github/workflows || true
+
+          echo "===== EXPORT PRESET ====="
+          if [ -f export_presets.cfg ]; then
+            echo "export_presets.cfg FOUND"
+            cat export_presets.cfg
+          else
+            echo "ERROR: export_presets.cfg NOT FOUND"
+            exit 1
+          fi
+
+
+      # 9. Import Godot project
+      - name: Import Project
         run: |
           godot --headless --editor --quit
 
-      - name: Build Android
+
+      # 10. Build Android APK
+      - name: Build APK
         run: |
           mkdir -p build
 
           godot \
             --headless \
             --path . \
-            --export-debug \
-            "Android" \
+            --export-debug "Android" \
             build/BubbleShooter.apk
 
-      - name: Show Build Files
-        if: always()
+
+      # 11. Check APK
+      - name: Check APK
         run: |
           echo "===== BUILD DIRECTORY ====="
-          ls -lah build || true
-          echo "==========================="
+          ls -lh build/
 
+          if [ ! -f build/BubbleShooter.apk ]; then
+            echo "ERROR: APK was not created!"
+            exit 1
+          fi
+
+          echo "APK BUILD SUCCESSFUL"
+
+
+      # 12. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
-        if: success()
         with:
           name: Bubble-Shooter-APK
           path: build/BubbleShooter.apk

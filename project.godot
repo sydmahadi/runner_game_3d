@@ -1,10 +1,8 @@
-; Engine configuration file.
-
 config_version=5
 
 [application]
 
-config/name="Deer Runner 3D"
+config/name="Bubble Shooter"
 run/main_scene="res://Main.tscn"
 
 [display]
@@ -19,4 +17,4 @@ window/stretch/mode="canvas_items"
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-environment/defaults/default_clear_color=Color(0.03, 0.08, 0.06, 1)
+environment/defaults/default_clear_color=Color(0.05, 0.05, 0.08, 1)
